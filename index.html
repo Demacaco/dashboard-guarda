@@ -6,11 +6,12 @@
     <title>Dashboard - Controle de Guarda de Peças</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #030712; /* Quase preto */
+            background-color: #030712;
         }
         .kpi-card {
             background-color: #1F2937;
@@ -30,31 +31,50 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+        .loader {
+            border: 4px solid #374151;
+            border-top: 4px solid #38bdf8;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="text-gray-200 p-4 sm:p-6 lg:p-8">
 
-    <div class="max-w-7xl mx-auto">
+    <div id="loader-container" class="fixed inset-0 bg-gray-900/80 flex justify-center items-center z-50">
+        <div class="loader"></div>
+    </div>
+
+    <div id="dashboard-content" class="max-w-7xl mx-auto hidden">
         <!-- Cabeçalho -->
         <header class="mb-8 text-center">
             <h1 class="text-4xl sm:text-5xl font-extrabold title-gradient tracking-tight">Controle de Fila de Armazenamento</h1>
             <p class="text-gray-400 mt-4 text-lg font-medium">STATUS EM ANDAMENTO - RESUMO GERAL</p>
             <p id="last-update" class="text-gray-500 mt-2 text-sm"></p>
+            <button onclick="atualizarDados()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                🔄 Atualizar Dados
+            </button>
         </header>
 
         <!-- Seção de KPIs Principais -->
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-8 text-center">
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Gaiolas Grandes</h2>
-                <p id="kpi-gaiolas-grandes" class="text-5xl font-bold text-white mt-2">50</p>
+                <p id="kpi-gaiolas-grandes" class="text-5xl font-bold text-white mt-2">--</p>
             </div>
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Gaiolas Pequenas</h2>
-                <p id="kpi-gaiolas-pequenas" class="text-5xl font-bold text-white mt-2">34</p>
+                <p id="kpi-gaiolas-pequenas" class="text-5xl font-bold text-white mt-2">--</p>
             </div>
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Total de Pallets</h2>
-                <p id="kpi-total-pallets" class="text-5xl font-bold text-white mt-2">25</p>
+                <p id="kpi-total-pallets" class="text-5xl font-bold text-white mt-2">--</p>
             </div>
             <div class="kpi-card p-4 rounded-xl border-2 border-amber-500/50">
                 <h2 class="text-sm font-semibold text-amber-400">Aguardando</h2>
@@ -66,7 +86,7 @@
             </div>
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Total Operadores</h2>
-                <p id="kpi-operadores" class="text-5xl font-bold text-white mt-2">4</p>
+                <p id="kpi-operadores" class="text-5xl font-bold text-white mt-2">--</p>
             </div>
              <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Total de Itens</h2>
@@ -101,45 +121,111 @@
     </div>
 
     <script>
-        // --- DADOS DE EXEMPLO PARA POPULAR OS GRÁFICOS E CARDS RESTANTES ---
-        const dadosDeExemplo = [
-            ["ID-1", "2025-10-01", "André", "JTA", "Haojue", "SKU-1", 100, "CX-1", "G-1", "Em Processo", "Gaiola Grande"],
-            ["ID-2", "2025-10-02", "Marcos", "JTA", "Haojue", "SKU-2", 150, "CX-2", "G-2", "Em Processo", "Gaiola Grande"],
-            ["ID-3", "2025-10-03", "Carlos", "JTZ", "Suzuki", "SKU-3", 200, "CX-3", "P-1", "Aguardando Armazenamento", "Pallet"],
-            ["ID-4", "2025-10-04", "Ana", "JTZ", "Zontes", "SKU-4", 50, "CX-4", "G-P1", "Aguardando Armazenamento", "Gaiola Pequena"],
-            ["ID-5", "2025-10-04", "Ana", "JTA", "Haojue", "SKU-5", 80, "CX-5", "G-3", "Aguardando Armazenamento", "Gaiola Grande"],
-            ["ID-6", "2025-10-05", "Carlos", "JTA", "Haojue", "SKU-6", 120, "CX-6", "G-4", "Aguardando Armazenamento", "Gaiola Grande"],
-        ];
+        // CONFIGURAÇÃO - Substitua pela URL do seu Web App do Google Apps Script
+        const WEB_APP_URL = 'https://script.google.com/macros/s/SEU_SCRIPT_ID/exec';
         
         let entradasChartInstance = null;
         let statusChartInstance = null;
 
         document.addEventListener('DOMContentLoaded', function () {
-            processarDados(dadosDeExemplo);
+            carregarDados();
+            // Atualizar automaticamente a cada 2 minutos
+            setInterval(carregarDados, 120000);
         });
-        
-        function processarDados(dados) {
-            atualizarKPIs(dados);
-            criarGraficoEntradas(dados);
-            criarGraficoStatus(dados);
-            
-            const agora = new Date();
-            document.getElementById('last-update').textContent = `Atualizado em: ${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR')}`;
+
+        async function carregarDados() {
+            try {
+                mostrarLoader(true);
+                
+                // Tenta buscar dados do Google Apps Script
+                const response = await axios.get(`${WEB_APP_URL}?action=getDashboardData`, {
+                    timeout: 10000
+                });
+                
+                if (response.data && response.data.success) {
+                    processarDados(response.data.data);
+                } else {
+                    throw new Error('Dados não recebidos do servidor');
+                }
+            } catch (error) {
+                console.warn('Erro ao carregar dados online, usando dados de exemplo:', error);
+                // Dados de exemplo para demonstração
+                const dadosExemplo = [
+                    ["GP-20251001-120000", "2025-10-01", "Andre", "JTZ", "Haojue", "1111", 500, "33333", "G-Grande-001", "Aguardando Armazenamento"],
+                    ["GP-20251002-140000", "2025-10-02", "Marcos", "JTA", "Suzuki", "2222", 5555, "111111", "G-Pequena-001", "em processo"],
+                    ["GP-20251004-134638", "2025-10-04", "João", "JTZ", "Kymco", "1250", 2222, "2222", "P-001", "Aguardando Armazenamento"],
+                    ["GP-20251004-150535", "2025-10-04", "Maria", "JTZ", "Kymco", "999", 5000, "22", "G-Grande-002", "Aguardando Armazenamento"],
+                    ["GP-20251005-090000", "2025-10-05", "Andre", "JTA", "Zontes", "3333", 1000, "4444", "G-Pequena-002", "em processo"]
+                ];
+                processarDados(dadosExemplo);
+            }
         }
 
-        function atualizarKPIs(dados) {
-            const unidadesPendentes = dados.filter(linha => linha[9] && linha[9].toLowerCase() !== 'finalizado');
-            
-            // Números fixos já estão no HTML. Apenas os cards calculados são atualizados aqui.
-            const aguardando = (50 + 34 + 25) - (unidadesPendentes.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length);
-            const emProcesso = unidadesPendentes.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length;
-            const totalItens = (50 * 150) + (34 * 40) + (25 * 200); // Média de itens para um total realista
-            const caixas = 50 + 34 + 25; // Uma caixa por unidade como exemplo
-            const guardadosHoje = 1850; // Número fixo para exemplo
+        function atualizarDados() {
+            carregarDados();
+        }
 
+        function mostrarLoader(mostrar) {
+            document.getElementById('loader-container').style.display = mostrar ? 'flex' : 'none';
+        }
+
+        function processarDados(dados) {
+            if (!dados || dados.length === 0) {
+                document.getElementById('dashboard-content').innerHTML = 
+                    '<p class="text-center text-gray-400 text-xl">Nenhum dado encontrado. Comece registrando itens pelo formulário.</p>';
+                mostrarLoader(false);
+                return;
+            }
+
+            const unidadesPendentes = dados.filter(linha => linha[9] && linha[9].toLowerCase() !== 'finalizado');
+            atualizarKPIs(unidadesPendentes, dados);
+            criarGraficoEntradas(unidadesPendentes);
+            criarGraficoStatus(unidadesPendentes);
+            
+            const agora = new Date();
+            document.getElementById('last-update').textContent = 
+                `Atualizado em: ${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR')}`;
+            
+            document.getElementById('dashboard-content').classList.remove('hidden');
+            mostrarLoader(false);
+        }
+
+        function atualizarKPIs(pendentes, todos) {
+            const getTipoUnidade = (linha) => {
+                const gaiolaStr = String(linha[8] || '').toLowerCase();
+                if (gaiolaStr.includes('p-') || gaiolaStr.includes('pallet')) return 'Pallet';
+                if (gaiolaStr.includes('g-grande') || gaiolaStr.includes('grande')) return 'Gaiola Grande';
+                if (gaiolaStr.includes('g-pequena') || gaiolaStr.includes('pequena')) return 'Gaiola Pequena';
+                // Regra baseada no responsável (exemplo)
+                return (String(linha[2]).toLowerCase() === 'andre') ? 'Gaiola Pequena' : 'Gaiola Grande';
+            };
+
+            const aguardando = pendentes.filter(linha => 
+                linha[9] && linha[9].toLowerCase().includes('aguardando')).length;
+            const emProcesso = pendentes.filter(linha => 
+                linha[9] && linha[9].toLowerCase().includes('em processo')).length;
+            const totalItens = pendentes.reduce((soma, linha) => soma + (parseInt(linha[6], 10) || 0), 0);
+            
+            const totalPallets = pendentes.filter(linha => getTipoUnidade(linha) === 'Pallet').length;
+            const gaiolasGrandes = pendentes.filter(linha => getTipoUnidade(linha) === 'Gaiola Grande').length;
+            const gaiolasPequenas = pendentes.filter(linha => getTipoUnidade(linha) === 'Gaiola Pequena').length;
+            
+            const operadores = new Set(pendentes.map(linha => linha[2]).filter(Boolean)).size;
+            const caixas = new Set(pendentes.map(linha => linha[7]).filter(Boolean)).size;
+
+            const hojeStringCalc = new Date().toISOString().split('T')[0];
+            const guardadosHoje = todos
+                .filter(linha => linha[9] && linha[9].toLowerCase() === 'finalizado' && linha[1] === hojeStringCalc)
+                .reduce((soma, linha) => soma + (parseInt(linha[6], 10) || 0), 0);
+
+            // Atualizar os elementos HTML
+            document.getElementById('kpi-gaiolas-grandes').textContent = gaiolasGrandes;
+            document.getElementById('kpi-gaiolas-pequenas').textContent = gaiolasPequenas;
+            document.getElementById('kpi-total-pallets').textContent = totalPallets;
             document.getElementById('kpi-aguardando').textContent = aguardando;
             document.getElementById('kpi-em-processo').textContent = emProcesso;
             document.getElementById('kpi-total-itens').textContent = totalItens.toLocaleString('pt-BR');
+            document.getElementById('kpi-operadores').textContent = operadores;
             document.getElementById('kpi-caixas').textContent = caixas;
             document.getElementById('kpi-guardados-hoje').textContent = guardadosHoje.toLocaleString('pt-BR');
         }
@@ -147,8 +233,10 @@
         function criarGraficoStatus(dados) {
             if (statusChartInstance) statusChartInstance.destroy();
             
-            const aguardando = (50 + 34 + 25) - (dados.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length);
-            const emProcesso = dados.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length;
+            const aguardando = dados.filter(linha => 
+                linha[9] && linha[9].toLowerCase().includes('aguardando')).length;
+            const emProcesso = dados.filter(linha => 
+                linha[9] && linha[9].toLowerCase().includes('em processo')).length;
 
             const ctx = document.getElementById('statusChart').getContext('2d');
             statusChartInstance = new Chart(ctx, {
@@ -194,7 +282,8 @@
                 return acc;
             }, {});
 
-            const labels = Object.keys(entradasPorDia).sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
+            const labels = Object.keys(entradasPorDia).sort((a,b) => 
+                new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
             const dataValues = labels.map(label => entradasPorDia[label]);
 
             const ctx = document.getElementById('entradasChart').getContext('2d');
@@ -213,8 +302,15 @@
                 },
                 options: { 
                     scales: { 
-                        y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
-                        x: { grid: { color: 'transparent' }, ticks: { color: '#9ca3af' } }
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: '#374151' }, 
+                            ticks: { color: '#9ca3af', stepSize: 1 } 
+                        },
+                        x: { 
+                            grid: { color: 'transparent' }, 
+                            ticks: { color: '#9ca3af' } 
+                        }
                     }, 
                     plugins: { legend: { display: false } } 
                 }
@@ -223,4 +319,3 @@
     </script>
 </body>
 </html>
-
