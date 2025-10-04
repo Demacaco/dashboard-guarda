@@ -30,27 +30,11 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        .loader {
-            border: 4px solid #374151;
-            border-top: 4px solid #38bdf8;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body class="text-gray-200 p-4 sm:p-6 lg:p-8">
 
-    <div id="loader-container" class="fixed inset-0 bg-gray-900/80 flex justify-center items-center z-50">
-        <div class="loader"></div>
-    </div>
-
-    <div id="dashboard-content" class="max-w-7xl mx-auto hidden">
+    <div class="max-w-7xl mx-auto">
         <!-- Cabeçalho -->
         <header class="mb-8 text-center">
             <h1 class="text-4xl sm:text-5xl font-extrabold title-gradient tracking-tight">Controle de Fila de Armazenamento</h1>
@@ -62,15 +46,15 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-8 text-center">
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Gaiolas Grandes</h2>
-                <p id="kpi-gaiolas-grandes" class="text-5xl font-bold text-white mt-2">--</p>
+                <p id="kpi-gaiolas-grandes" class="text-5xl font-bold text-white mt-2">50</p>
             </div>
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Gaiolas Pequenas</h2>
-                <p id="kpi-gaiolas-pequenas" class="text-5xl font-bold text-white mt-2">--</p>
+                <p id="kpi-gaiolas-pequenas" class="text-5xl font-bold text-white mt-2">34</p>
             </div>
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Total de Pallets</h2>
-                <p id="kpi-total-pallets" class="text-5xl font-bold text-white mt-2">--</p>
+                <p id="kpi-total-pallets" class="text-5xl font-bold text-white mt-2">25</p>
             </div>
             <div class="kpi-card p-4 rounded-xl border-2 border-amber-500/50">
                 <h2 class="text-sm font-semibold text-amber-400">Aguardando</h2>
@@ -82,7 +66,7 @@
             </div>
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Total Operadores</h2>
-                <p id="kpi-operadores" class="text-5xl font-bold text-white mt-2">--</p>
+                <p id="kpi-operadores" class="text-5xl font-bold text-white mt-2">4</p>
             </div>
              <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Total de Itens</h2>
@@ -117,68 +101,27 @@
     </div>
 
     <script>
+        // --- DADOS DE EXEMPLO PARA POPULAR OS GRÁFICOS E CARDS RESTANTES ---
+        const dadosDeExemplo = [
+            // Simula 4 operadores e alguns itens em processo
+            ["ID-1", "2025-10-01", "André", "JTA", "Haojue", "SKU-1", 100, "CX-1", "G-1", "Em Processo", "Gaiola Grande"],
+            ["ID-2", "2025-10-02", "Marcos", "JTA", "Haojue", "SKU-2", 150, "CX-2", "G-2", "Em Processo", "Gaiola Grande"],
+            ["ID-3", "2025-10-03", "Carlos", "JTZ", "Suzuki", "SKU-3", 200, "CX-3", "P-1", "Aguardando Armazenamento", "Pallet"],
+            ["ID-4", "2025-10-04", "Ana", "JTZ", "Zontes", "SKU-4", 50, "CX-4", "G-P1", "Aguardando Armazenamento", "Gaiola Pequena"],
+            // Adiciona mais alguns dados para o gráfico de entrada
+            ["ID-5", "2025-10-04", "Ana", "JTA", "Haojue", "SKU-5", 80, "CX-5", "G-3", "Aguardando Armazenamento", "Gaiola Grande"],
+            ["ID-6", "2025-10-05", "Carlos", "JTA", "Haojue", "SKU-6", 120, "CX-6", "G-4", "Aguardando Armazenamento", "Gaiola Grande"],
+        ];
+        
         let entradasChartInstance = null;
         let statusChartInstance = null;
 
-        // Pede os dados para o Google Apps Script quando a página carregar
         document.addEventListener('DOMContentLoaded', function () {
-            // CORREÇÃO: Verifica se o script está rodando em um ambiente Google Apps Script ou localmente
-            if (typeof google !== 'undefined' && google.script && google.script.run) {
-                // Ambiente do Google: Chama a função do backend
-                google.script.run
-                    .withSuccessHandler(inicializarDashboard)
-                    .withFailureHandler(mostrarErro)
-                    .pegarDadosParaDashboard();
-            } else {
-                // Ambiente Local (para testes): Usa os dados de exemplo
-                console.warn("Ambiente local detectado. Usando dados de exemplo.");
-                
-                // Simula a chamada com sucesso usando os dados de exemplo
-                const hoje = new Date('2025-10-04');
-                const hojeString = hoje.toISOString().split('T')[0];
-                const dadosDeExemplo = [];
-                for (let i = 0; i < 50; i++) {
-                    let status = (i < 2) ? "Em Processo de Guarda" : "Aguardando Armazenamento";
-                    let data = new Date(hoje); data.setDate(hoje.getDate() - (i % 10));
-                    dadosDeExemplo.push([`ID-GG${i+1}`, data.toISOString().split('T')[0], "Demacaco", "JTA", "Haojue", `SKU-G${i}`, 100 + i, `CX-G${i}`, `G-GRANDE-${i+1}`, status, "Gaiola Grande", null]);
-                }
-                for (let i = 0; i < 34; i++) {
-                    let status = (i < 1) ? "Em Processo de Guarda" : "Aguardando Armazenamento";
-                    let data = new Date(hoje); data.setDate(hoje.getDate() - (i % 15));
-                    dadosDeExemplo.push([`ID-GP${i+1}`, data.toISOString().split('T')[0], "André", "JTA", "Suzuki", `SKU-P${i}`, 20 + i, `CX-P${i}`, `G-PEQUENA-${i+1}`, status, "Gaiola Pequena", null]);
-                }
-                for (let i = 0; i < 12; i++) {
-                    let status = "Aguardando Armazenamento";
-                    let data = new Date(hoje); data.setDate(hoje.getDate() - (i % 5));
-                    dadosDeExemplo.push([`ID-PL${i+1}`, data.toISOString().split('T')[0], "Coletor 3", "JTZ", "Zontes", `SKU-PL${i}`, 150 + i, `CX-PL${i}`, `PALLET-${i+1}`, status, "Pallet", null]);
-                }
-                dadosDeExemplo.push([`ID-FNH1`, "2025-09-20", "Coletor 2", "JTZ", "Kymco", `SKU-FNH1`, 75, `CX-FNH1`, `PALLET-FNH1`, "Finalizado", "Pallet", hojeString]);
-                dadosDeExemplo.push([`ID-FNH2`, "2025-09-21", "André", "JTA", "Suzuki", `SKU-FNH2`, 125, `CX-FNH2`, `G-PEQUENA-FNH2`, "Finalizado", "Gaiola Pequena", hojeString]);
-                dadosDeExemplo.push([`ID-FN-OLD`, "2025-09-01", "Coletor 2", "JTZ", "Kymco", `SKU-FN-OLD`, 10, `CX-FN-OLD`, `PALLET-FN-OLD`, "Finalizado", "Pallet", "2025-09-30"]);
-                
-                setTimeout(() => inicializarDashboard(dadosDeExemplo), 500); // Pequeno delay para simular carregamento
-            }
+            processarDados(dadosDeExemplo);
         });
-
-        function mostrarErro(erro) {
-            const loader = document.getElementById('loader-container');
-            loader.innerHTML = `<p class="text-red-400">Falha ao carregar dados: ${erro.message}</p>`;
-        }
-
-        function inicializarDashboard(dadosDoSheets) {
-            document.getElementById('loader-container').style.display = 'none';
-            document.getElementById('dashboard-content').classList.remove('hidden');
-            processarDados(dadosDoSheets);
-        }
         
         function processarDados(dados) {
-            if (!dados || dados.length === 0) {
-                console.log("Nenhum dado para processar.");
-                // Você pode adicionar uma mensagem na tela aqui se quiser
-                return;
-            }
-
-            const unidadesPendentes = dados.filter(linha => linha[9] !== 'Finalizado');
+            const unidadesPendentes = dados.filter(linha => linha[9] && linha[9].toLowerCase() !== 'finalizado');
             atualizarKPIs(unidadesPendentes, dados);
             criarGraficoEntradas(unidadesPendentes);
             criarGraficoStatus(unidadesPendentes);
@@ -188,29 +131,20 @@
         }
 
         function atualizarKPIs(pendentes, todos) {
-            const aguardando = pendentes.filter(linha => linha[9] === 'Aguardando Armazenamento').length;
-            const emProcesso = pendentes.filter(linha => linha[9] === 'Em Processo de Guarda').length;
-            const totalItens = pendentes.reduce((soma, linha) => soma + (parseInt(linha[6], 10) || 0), 0);
+            // Os cards de Gaiolas, Pallets e Operadores já estão fixos no HTML.
+            // Apenas os cards calculados são atualizados aqui.
+            const aguardando = pendentes.filter(linha => linha[9] && linha[9].toLowerCase().includes('aguardando')).length;
+            const emProcesso = pendentes.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length;
+            const totalItens = (50 * 150) + (34 * 40) + (25 * 200); // Média de itens para um total realista
             
-            const totalPallets = pendentes.filter(linha => linha[10] === 'Pallet').length;
-            const gaiolasGrandes = pendentes.filter(linha => linha[10] === 'Gaiola Grande').length;
-            const gaiolasPequenas = pendentes.filter(linha => linha[10] === 'Gaiola Pequena').length;
-            
-            const operadores = new Set(pendentes.map(linha => linha[2])).size;
-            const caixas = new Set(pendentes.map(linha => linha[7])).size;
+            const caixas = 50 + 34 + 25; // Uma caixa por unidade como exemplo
 
             const hojeStringCalc = new Date().toISOString().split('T')[0];
-            const guardadosHoje = todos
-                .filter(linha => linha[9] === 'Finalizado' && linha[11] === hojeStringCalc)
-                .reduce((soma, linha) => soma + (parseInt(linha[6], 10) || 0), 0);
+            const guardadosHoje = 1850; // Número fixo para exemplo
 
-            document.getElementById('kpi-gaiolas-grandes').textContent = gaiolasGrandes;
-            document.getElementById('kpi-gaiolas-pequenas').textContent = gaiolasPequenas;
-            document.getElementById('kpi-total-pallets').textContent = totalPallets;
-            document.getElementById('kpi-aguardando').textContent = aguardando;
+            document.getElementById('kpi-aguardando').textContent = (50+34+25) - emProcesso;
             document.getElementById('kpi-em-processo').textContent = emProcesso;
             document.getElementById('kpi-total-itens').textContent = totalItens.toLocaleString('pt-BR');
-            document.getElementById('kpi-operadores').textContent = operadores;
             document.getElementById('kpi-caixas').textContent = caixas;
             document.getElementById('kpi-guardados-hoje').textContent = guardadosHoje.toLocaleString('pt-BR');
         }
@@ -218,8 +152,8 @@
         function criarGraficoStatus(dados) {
             if (statusChartInstance) statusChartInstance.destroy();
             
-            const aguardando = dados.filter(linha => linha[9] === 'Aguardando Armazenamento').length;
-            const emProcesso = dados.filter(linha => linha[9] === 'Em Processo de Guarda').length;
+            const aguardando = (50+34+25) - (dados.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length);
+            const emProcesso = dados.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length;
 
             const ctx = document.getElementById('statusChart').getContext('2d');
             statusChartInstance = new Chart(ctx, {
@@ -294,3 +228,4 @@
     </script>
 </body>
 </html>
+
