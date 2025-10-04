@@ -103,12 +103,10 @@
     <script>
         // --- DADOS DE EXEMPLO PARA POPULAR OS GRÁFICOS E CARDS RESTANTES ---
         const dadosDeExemplo = [
-            // Simula 4 operadores e alguns itens em processo
             ["ID-1", "2025-10-01", "André", "JTA", "Haojue", "SKU-1", 100, "CX-1", "G-1", "Em Processo", "Gaiola Grande"],
             ["ID-2", "2025-10-02", "Marcos", "JTA", "Haojue", "SKU-2", 150, "CX-2", "G-2", "Em Processo", "Gaiola Grande"],
             ["ID-3", "2025-10-03", "Carlos", "JTZ", "Suzuki", "SKU-3", 200, "CX-3", "P-1", "Aguardando Armazenamento", "Pallet"],
             ["ID-4", "2025-10-04", "Ana", "JTZ", "Zontes", "SKU-4", 50, "CX-4", "G-P1", "Aguardando Armazenamento", "Gaiola Pequena"],
-            // Adiciona mais alguns dados para o gráfico de entrada
             ["ID-5", "2025-10-04", "Ana", "JTA", "Haojue", "SKU-5", 80, "CX-5", "G-3", "Aguardando Armazenamento", "Gaiola Grande"],
             ["ID-6", "2025-10-05", "Carlos", "JTA", "Haojue", "SKU-6", 120, "CX-6", "G-4", "Aguardando Armazenamento", "Gaiola Grande"],
         ];
@@ -121,28 +119,25 @@
         });
         
         function processarDados(dados) {
-            const unidadesPendentes = dados.filter(linha => linha[9] && linha[9].toLowerCase() !== 'finalizado');
-            atualizarKPIs(unidadesPendentes, dados);
-            criarGraficoEntradas(unidadesPendentes);
-            criarGraficoStatus(unidadesPendentes);
+            atualizarKPIs(dados);
+            criarGraficoEntradas(dados);
+            criarGraficoStatus(dados);
             
             const agora = new Date();
             document.getElementById('last-update').textContent = `Atualizado em: ${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR')}`;
         }
 
-        function atualizarKPIs(pendentes, todos) {
-            // Os cards de Gaiolas, Pallets e Operadores já estão fixos no HTML.
-            // Apenas os cards calculados são atualizados aqui.
-            const aguardando = pendentes.filter(linha => linha[9] && linha[9].toLowerCase().includes('aguardando')).length;
-            const emProcesso = pendentes.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length;
-            const totalItens = (50 * 150) + (34 * 40) + (25 * 200); // Média de itens para um total realista
+        function atualizarKPIs(dados) {
+            const unidadesPendentes = dados.filter(linha => linha[9] && linha[9].toLowerCase() !== 'finalizado');
             
+            // Números fixos já estão no HTML. Apenas os cards calculados são atualizados aqui.
+            const aguardando = (50 + 34 + 25) - (unidadesPendentes.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length);
+            const emProcesso = unidadesPendentes.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length;
+            const totalItens = (50 * 150) + (34 * 40) + (25 * 200); // Média de itens para um total realista
             const caixas = 50 + 34 + 25; // Uma caixa por unidade como exemplo
-
-            const hojeStringCalc = new Date().toISOString().split('T')[0];
             const guardadosHoje = 1850; // Número fixo para exemplo
 
-            document.getElementById('kpi-aguardando').textContent = (50+34+25) - emProcesso;
+            document.getElementById('kpi-aguardando').textContent = aguardando;
             document.getElementById('kpi-em-processo').textContent = emProcesso;
             document.getElementById('kpi-total-itens').textContent = totalItens.toLocaleString('pt-BR');
             document.getElementById('kpi-caixas').textContent = caixas;
@@ -152,7 +147,7 @@
         function criarGraficoStatus(dados) {
             if (statusChartInstance) statusChartInstance.destroy();
             
-            const aguardando = (50+34+25) - (dados.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length);
+            const aguardando = (50 + 34 + 25) - (dados.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length);
             const emProcesso = dados.filter(linha => linha[9] && linha[9].toLowerCase().includes('em processo')).length;
 
             const ctx = document.getElementById('statusChart').getContext('2d');
