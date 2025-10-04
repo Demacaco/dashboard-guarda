@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Controle de Guarda de Peças</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #030712; /* Quase preto */
+        }
+        .kpi-card {
+            background-color: #1F2937;
+            border: 1px solid #374151;
+            transition: all 0.2s ease-in-out;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+        }
+        .chart-container {
+            background-color: #1F2937;
+            border: 1px solid #374151;
+        }
+        .title-gradient {
+            background: -webkit-linear-gradient(45deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .loader {
+            border: 4px solid #374151;
+            border-top: 4px solid #38bdf8;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-200 p-4 sm:p-6 lg:p-8">
+
+    <div id="loader-container" class="fixed inset-0 bg-gray-900/80 flex justify-center items-center z-50">
+        <div class="loader"></div>
+    </div>
+
+    <div id="dashboard-content" class="max-w-7xl mx-auto hidden">
+        <!-- Cabeçalho -->
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl sm:text-5xl font-extrabold title-gradient tracking-tight">Controle de Fila de Armazenamento</h1>
+            <p class="text-gray-400 mt-4 text-lg font-medium">STATUS EM ANDAMENTO - RESUMO GERAL</p>
+            <p id="last-update" class="text-gray-500 mt-2 text-sm"></p>
+        </header>
+
+        <!-- Seção de KPIs Principais -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-8 text-center">
+            <div class="kpi-card p-4 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-400">Gaiolas Grandes</h2>
+                <p id="kpi-gaiolas-grandes" class="text-5xl font-bold text-white mt-2">--</p>
+            </div>
+            <div class="kpi-card p-4 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-400">Gaiolas Pequenas</h2>
+                <p id="kpi-gaiolas-pequenas" class="text-5xl font-bold text-white mt-2">--</p>
+            </div>
+            <div class="kpi-card p-4 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-400">Total de Pallets</h2>
+                <p id="kpi-total-pallets" class="text-5xl font-bold text-white mt-2">--</p>
+            </div>
+            <div class="kpi-card p-4 rounded-xl border-2 border-amber-500/50">
+                <h2 class="text-sm font-semibold text-amber-400">Aguardando</h2>
+                <p id="kpi-aguardando" class="text-5xl font-bold text-amber-300 mt-2">--</p>
+            </div>
+            <div class="kpi-card p-4 rounded-xl border-2 border-emerald-500/50">
+                <h2 class="text-sm font-semibold text-emerald-400">Em Processo</h2>
+                <p id="kpi-em-processo" class="text-5xl font-bold text-emerald-300 mt-2">--</p>
+            </div>
+            <div class="kpi-card p-4 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-400">Total Operadores</h2>
+                <p id="kpi-operadores" class="text-5xl font-bold text-white mt-2">--</p>
+            </div>
+             <div class="kpi-card p-4 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-400">Total de Itens</h2>
+                <p id="kpi-total-itens" class="text-5xl font-bold text-white mt-2">--</p>
+            </div>
+             <div class="kpi-card p-4 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-400">Caixas Únicas</h2>
+                <p id="kpi-caixas" class="text-5xl font-bold text-white mt-2">--</p>
+            </div>
+            <div class="kpi-card p-4 rounded-xl bg-sky-900/50 border-2 border-sky-500/50">
+                <h2 class="text-sm font-semibold text-sky-400">Guardados Hoje</h2>
+                <p id="kpi-guardados-hoje" class="text-5xl font-bold text-sky-300 mt-2">--</p>
+            </div>
+        </div>
+
+        <!-- Seção de Gráficos -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+            <div class="lg:col-span-2 chart-container p-6 rounded-xl">
+                <h3 class="text-lg font-semibold text-white mb-4 text-center">Status da Fila</h3>
+                <canvas id="statusChart"></canvas>
+            </div>
+            <div class="lg:col-span-3 chart-container p-6 rounded-xl">
+                <h3 class="text-lg font-semibold text-white mb-4 text-center">Entrada de Unidades por Dia</h3>
+                <canvas id="entradasChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Rodapé -->
+        <footer class="text-center mt-10 text-gray-500 text-sm">
+            <p>ANDRE REZENDE - Sistema de Controle de Guarda © 2025</p>
+        </footer>
+    </div>
+
+    <script>
+        let entradasChartInstance = null;
+        let statusChartInstance = null;
+
+        // Pede os dados para o Google Apps Script quando a página carregar
+        document.addEventListener('DOMContentLoaded', function () {
+            // CORREÇÃO: Verifica se o script está rodando em um ambiente Google Apps Script ou localmente
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                // Ambiente do Google: Chama a função do backend
+                google.script.run
+                    .withSuccessHandler(inicializarDashboard)
+                    .withFailureHandler(mostrarErro)
+                    .pegarDadosParaDashboard();
+            } else {
+                // Ambiente Local (para testes): Usa os dados de exemplo
+                console.warn("Ambiente local detectado. Usando dados de exemplo.");
+                
+                // Simula a chamada com sucesso usando os dados de exemplo
+                const hoje = new Date('2025-10-04');
+                const hojeString = hoje.toISOString().split('T')[0];
+                const dadosDeExemplo = [];
+                for (let i = 0; i < 50; i++) {
+                    let status = (i < 2) ? "Em Processo de Guarda" : "Aguardando Armazenamento";
+                    let data = new Date(hoje); data.setDate(hoje.getDate() - (i % 10));
+                    dadosDeExemplo.push([`ID-GG${i+1}`, data.toISOString().split('T')[0], "Demacaco", "JTA", "Haojue", `SKU-G${i}`, 100 + i, `CX-G${i}`, `G-GRANDE-${i+1}`, status, "Gaiola Grande", null]);
+                }
+                for (let i = 0; i < 34; i++) {
+                    let status = (i < 1) ? "Em Processo de Guarda" : "Aguardando Armazenamento";
+                    let data = new Date(hoje); data.setDate(hoje.getDate() - (i % 15));
+                    dadosDeExemplo.push([`ID-GP${i+1}`, data.toISOString().split('T')[0], "André", "JTA", "Suzuki", `SKU-P${i}`, 20 + i, `CX-P${i}`, `G-PEQUENA-${i+1}`, status, "Gaiola Pequena", null]);
+                }
+                for (let i = 0; i < 12; i++) {
+                    let status = "Aguardando Armazenamento";
+                    let data = new Date(hoje); data.setDate(hoje.getDate() - (i % 5));
+                    dadosDeExemplo.push([`ID-PL${i+1}`, data.toISOString().split('T')[0], "Coletor 3", "JTZ", "Zontes", `SKU-PL${i}`, 150 + i, `CX-PL${i}`, `PALLET-${i+1}`, status, "Pallet", null]);
+                }
+                dadosDeExemplo.push([`ID-FNH1`, "2025-09-20", "Coletor 2", "JTZ", "Kymco", `SKU-FNH1`, 75, `CX-FNH1`, `PALLET-FNH1`, "Finalizado", "Pallet", hojeString]);
+                dadosDeExemplo.push([`ID-FNH2`, "2025-09-21", "André", "JTA", "Suzuki", `SKU-FNH2`, 125, `CX-FNH2`, `G-PEQUENA-FNH2`, "Finalizado", "Gaiola Pequena", hojeString]);
+                dadosDeExemplo.push([`ID-FN-OLD`, "2025-09-01", "Coletor 2", "JTZ", "Kymco", `SKU-FN-OLD`, 10, `CX-FN-OLD`, `PALLET-FN-OLD`, "Finalizado", "Pallet", "2025-09-30"]);
+                
+                setTimeout(() => inicializarDashboard(dadosDeExemplo), 500); // Pequeno delay para simular carregamento
+            }
+        });
+
+        function mostrarErro(erro) {
+            const loader = document.getElementById('loader-container');
+            loader.innerHTML = `<p class="text-red-400">Falha ao carregar dados: ${erro.message}</p>`;
+        }
+
+        function inicializarDashboard(dadosDoSheets) {
+            document.getElementById('loader-container').style.display = 'none';
+            document.getElementById('dashboard-content').classList.remove('hidden');
+            processarDados(dadosDoSheets);
+        }
+        
+        function processarDados(dados) {
+            if (!dados || dados.length === 0) {
+                console.log("Nenhum dado para processar.");
+                // Você pode adicionar uma mensagem na tela aqui se quiser
+                return;
+            }
+
+            const unidadesPendentes = dados.filter(linha => linha[9] !== 'Finalizado');
+            atualizarKPIs(unidadesPendentes, dados);
+            criarGraficoEntradas(unidadesPendentes);
+            criarGraficoStatus(unidadesPendentes);
+            
+            const agora = new Date();
+            document.getElementById('last-update').textContent = `Atualizado em: ${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR')}`;
+        }
+
+        function atualizarKPIs(pendentes, todos) {
+            const aguardando = pendentes.filter(linha => linha[9] === 'Aguardando Armazenamento').length;
+            const emProcesso = pendentes.filter(linha => linha[9] === 'Em Processo de Guarda').length;
+            const totalItens = pendentes.reduce((soma, linha) => soma + (parseInt(linha[6], 10) || 0), 0);
+            
+            const totalPallets = pendentes.filter(linha => linha[10] === 'Pallet').length;
+            const gaiolasGrandes = pendentes.filter(linha => linha[10] === 'Gaiola Grande').length;
+            const gaiolasPequenas = pendentes.filter(linha => linha[10] === 'Gaiola Pequena').length;
+            
+            const operadores = new Set(pendentes.map(linha => linha[2])).size;
+            const caixas = new Set(pendentes.map(linha => linha[7])).size;
+
+            const hojeStringCalc = new Date().toISOString().split('T')[0];
+            const guardadosHoje = todos
+                .filter(linha => linha[9] === 'Finalizado' && linha[11] === hojeStringCalc)
+                .reduce((soma, linha) => soma + (parseInt(linha[6], 10) || 0), 0);
+
+            document.getElementById('kpi-gaiolas-grandes').textContent = gaiolasGrandes;
+            document.getElementById('kpi-gaiolas-pequenas').textContent = gaiolasPequenas;
+            document.getElementById('kpi-total-pallets').textContent = totalPallets;
+            document.getElementById('kpi-aguardando').textContent = aguardando;
+            document.getElementById('kpi-em-processo').textContent = emProcesso;
+            document.getElementById('kpi-total-itens').textContent = totalItens.toLocaleString('pt-BR');
+            document.getElementById('kpi-operadores').textContent = operadores;
+            document.getElementById('kpi-caixas').textContent = caixas;
+            document.getElementById('kpi-guardados-hoje').textContent = guardadosHoje.toLocaleString('pt-BR');
+        }
+
+        function criarGraficoStatus(dados) {
+            if (statusChartInstance) statusChartInstance.destroy();
+            
+            const aguardando = dados.filter(linha => linha[9] === 'Aguardando Armazenamento').length;
+            const emProcesso = dados.filter(linha => linha[9] === 'Em Processo de Guarda').length;
+
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            statusChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Aguardando Guarda', 'Em Processo'],
+                    datasets: [{
+                        data: [aguardando, emProcesso],
+                        backgroundColor: ['#f59e0b', '#10b981'],
+                        borderColor: '#1F2937',
+                        borderWidth: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#d1d5db' } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed !== null) {
+                                        const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) + '%' : '0.0%';
+                                        label += `${context.raw} unidades (${percentage})`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function criarGraficoEntradas(dados) {
+            if (entradasChartInstance) entradasChartInstance.destroy();
+            
+            const entradasPorDia = dados.reduce((acc, linha) => {
+                const data = new Date(linha[1]).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+                acc[data] = (acc[data] || 0) + 1;
+                return acc;
+            }, {});
+
+            const labels = Object.keys(entradasPorDia).sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
+            const dataValues = labels.map(label => entradasPorDia[label]);
+
+            const ctx = document.getElementById('entradasChart').getContext('2d');
+            entradasChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Unidades Registradas',
+                        data: dataValues,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1,
+                        borderRadius: 5
+                    }]
+                },
+                options: { 
+                    scales: { 
+                        y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
+                        x: { grid: { color: 'transparent' }, ticks: { color: '#9ca3af' } }
+                    }, 
+                    plugins: { legend: { display: false } } 
+                }
+            });
+        }
+    </script>
+</body>
+</html>
