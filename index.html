@@ -6,173 +6,158 @@
     <title>Dashboard - Controle de Guarda de Peças</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #030712;
-        }
-        .kpi-card {
-            background-color: #1F2937;
-            border: 1px solid #374151;
-            transition: all 0.2s ease-in-out;
-        }
-        .kpi-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
-        }
-        .chart-container {
-            background-color: #1F2937;
-            border: 1px solid #374151;
-        }
-        .title-gradient {
-            background: -webkit-linear-gradient(45deg, #38bdf8, #818cf8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .loader {
-            border: 4px solid #374151;
-            border-top: 4px solid #38bdf8;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        body { font-family: 'Inter', sans-serif; background-color: #030712; }
+        .kpi-card { background-color: #1F2937; border: 1px solid #374151; transition: all 0.2s; }
+        .kpi-card:hover { transform: translateY(-2px); }
+        .chart-container { background-color: #1F2937; border: 1px solid #374151; }
+        .title-gradient { background: linear-gradient(45deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .percentage-display { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body class="text-gray-200 p-4 sm:p-6 lg:p-8">
 
-    <div id="loader-container" class="fixed inset-0 bg-gray-900/80 flex justify-center items-center z-50">
-        <div class="loader"></div>
-    </div>
-
-    <div id="dashboard-content" class="max-w-7xl mx-auto hidden">
-        <!-- Cabeçalho -->
+    <div id="dashboard-content" class="max-w-7xl mx-auto">
         <header class="mb-8 text-center">
             <h1 class="text-4xl sm:text-5xl font-extrabold title-gradient tracking-tight">Controle de Fila de Armazenamento</h1>
             <p class="text-gray-400 mt-4 text-lg font-medium">STATUS EM ANDAMENTO - RESUMO GERAL</p>
             <p id="last-update" class="text-gray-500 mt-2 text-sm"></p>
-            <button onclick="atualizarDados()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                🔄 Atualizar Dados
-            </button>
         </header>
 
-        <!-- Seção de KPIs Principais -->
+        <!-- CARDS REAIS - BASEADOS NA SUA PLANILHA -->
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-8 text-center">
-            <!-- Gaiolas Grandes -->
+            <!-- UNIDADES POR TIPO -->
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Gaiolas Grandes</h2>
-                <p id="kpi-gaiolas-grandes" class="text-5xl font-bold text-white mt-2">50</p>
+                <p class="text-5xl font-bold text-white mt-2">6</p>
             </div>
             
-            <!-- Aguardando -->
-            <div class="kpi-card p-4 rounded-xl border-2 border-amber-500/50">
-                <h2 class="text-sm font-semibold text-amber-400">Aguardando</h2>
-                <p id="kpi-aguardando" class="text-5xl font-bold text-amber-300 mt-2">93</p>
-            </div>
-            
-            <!-- Total de Itens -->
-            <div class="kpi-card p-4 rounded-xl">
-                <h2 class="text-sm font-semibold text-gray-400">Total de Itens</h2>
-                <p id="kpi-total-itens" class="text-5xl font-bold text-white mt-2">9.332</p>
-            </div>
-
-            <!-- Gaiolas Pequenas -->
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Gaiolas Pequenas</h2>
-                <p id="kpi-gaiolas-pequenas" class="text-5xl font-bold text-white mt-2">34</p>
+                <p class="text-5xl font-bold text-white mt-2">2</p>
             </div>
             
-            <!-- Em Processo -->
-            <div class="kpi-card p-4 rounded-xl border-2 border-emerald-500/50">
-                <h2 class="text-sm font-semibold text-emerald-400">Em Processo</h2>
-                <p id="kpi-em-processo" class="text-5xl font-bold text-emerald-300 mt-2">3</p>
-            </div>
-            
-            <!-- Caixas Únicas -->
-            <div class="kpi-card p-4 rounded-xl">
-                <h2 class="text-sm font-semibold text-gray-400">Caixas Únicas</h2>
-                <p id="kpi-caixas" class="text-5xl font-bold text-white mt-2">36</p>
-            </div>
-
-            <!-- Total de Pallets -->
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Total de Pallets</h2>
-                <p id="kpi-total-pallets" class="text-5xl font-bold text-white mt-2">12</p>
+                <p class="text-5xl font-bold text-white mt-2">6</p>
+            </div>
+
+            <!-- ESTATÍSTICAS GERAIS -->
+            <div class="kpi-card p-4 rounded-xl border-2 border-emerald-500/50">
+                <h2 class="text-sm font-semibold text-emerald-400">Total Processados</h2>
+                <p class="text-5xl font-bold text-emerald-300 mt-2">24</p>
             </div>
             
-            <!-- Total Operadores -->
+            <div class="kpi-card p-4 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-400">Total de Itens</h2>
+                <p class="text-5xl font-bold text-white mt-2">59.383</p>
+            </div>
+            
+            <div class="kpi-card p-4 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-400">Caixas Únicas</h2>
+                <p class="text-5xl font-bold text-white mt-2">10</p>
+            </div>
+
+            <!-- OPERAÇÃO -->
             <div class="kpi-card p-4 rounded-xl">
                 <h2 class="text-sm font-semibold text-gray-400">Total Operadores</h2>
-                <p id="kpi-operadores" class="text-5xl font-bold text-white mt-2">3</p>
+                <p class="text-5xl font-bold text-white mt-2">3</p>
             </div>
             
-            <!-- Guardados Hoje -->
             <div class="kpi-card p-4 rounded-xl bg-sky-900/50 border-2 border-sky-500/50">
-                <h2 class="text-sm font-semibold text-sky-400">Guardados Hoje</h2>
-                <p id="kpi-guardados-hoje" class="text-5xl font-bold text-sky-300 mt-2">200</p>
+                <h2 class="text-sm font-semibold text-sky-400">Processados Hoje</h2>
+                <p class="text-5xl font-bold text-sky-300 mt-2">3</p>
+            </div>
+            
+            <div class="kpi-card p-4 rounded-xl border-2 border-amber-500/50">
+                <h2 class="text-sm font-semibold text-amber-400">Aguardando</h2>
+                <p class="text-5xl font-bold text-amber-300 mt-2">1</p>
             </div>
         </div>
 
-        <!-- Seção de Gráficos -->
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+        <!-- Gráficos Reais -->
+        <div class="grid grid-cols-1 lg:grid-cols-7 gap-6 mb-8">
+            <div class="lg:col-span-2 chart-container p-6 rounded-xl relative">
+                <h3 class="text-lg font-semibold text-white mb-4 text-center">Tipos de Unidades</h3>
+                <canvas id="unidadesChart"></canvas>
+                <div id="percentageDisplay" class="percentage-display">67%</div>
+            </div>
             <div class="lg:col-span-2 chart-container p-6 rounded-xl">
-                <h3 class="text-lg font-semibold text-white mb-4 text-center">Status da Fila</h3>
-                <canvas id="statusChart"></canvas>
+                <h3 class="text-lg font-semibold text-white mb-4 text-center">Distribuição por Empresa</h3>
+                <canvas id="empresaChart"></canvas>
             </div>
             <div class="lg:col-span-3 chart-container p-6 rounded-xl">
-                <h3 class="text-lg font-semibold text-white mb-4 text-center">Entrada de Unidades por Dia</h3>
-                <canvas id="entradasChart"></canvas>
+                <h3 class="text-lg font-semibold text-white mb-4 text-center">Processados por Dia</h3>
+                <canvas id="processadosChart"></canvas>
             </div>
         </div>
 
-        <!-- Rodapé -->
         <footer class="text-center mt-10 text-gray-500 text-sm">
             <p>ANDRE REZENDE - Sistema de Controle de Guarda © 2025</p>
         </footer>
     </div>
 
     <script>
-        let entradasChartInstance = null;
-        let statusChartInstance = null;
-
-        document.addEventListener('DOMContentLoaded', function () {
-            // Já inicia com os valores fixos que você definiu
-            inicializarDashboard();
-        });
-
-        function inicializarDashboard() {
-            document.getElementById('loader-container').style.display = 'none';
-            document.getElementById('dashboard-content').classList.remove('hidden');
-            
+        document.addEventListener('DOMContentLoaded', function() {
             // Atualiza data/hora
-            const agora = new Date();
             document.getElementById('last-update').textContent = 
-                `Atualizado em: ${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR')}`;
+                `Atualizado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`;
             
-            // Cria gráficos com valores padrão
-            criarGraficoStatus();
-            criarGraficoEntradas();
-        }
+            // DADOS REAIS DA SUA PLANILHA
+            const gaiolasGrandes = 6;    // Gaiolas 222, 111
+            const gaiolasPequenas = 2;   // Gaiolas 666, 777  
+            const pallets = 6;           // Gaiolas 888, 999
+            const totalUnidades = gaiolasGrandes + gaiolasPequenas + pallets;
+            const porcentagemPallets = Math.round((pallets / totalUnidades) * 100);
 
-        function criarGraficoStatus() {
-            if (statusChartInstance) statusChartInstance.destroy();
+            // Atualiza porcentagem central
+            document.getElementById('percentageDisplay').textContent = `${porcentagemPallets}%`;
 
-            const ctx = document.getElementById('statusChart').getContext('2d');
-            statusChartInstance = new Chart(ctx, {
+            // Gráfico de Unidades
+            new Chart(document.getElementById('unidadesChart'), {
                 type: 'doughnut',
                 data: {
-                    labels: ['Aguardando Guarda', 'Em Processo'],
+                    labels: ['Gaiolas Grandes', 'Gaiolas Pequenas', 'Pallets'],
                     datasets: [{
-                        data: [93, 3], // Seus valores reais
-                        backgroundColor: ['#f59e0b', '#10b981'],
-                        borderColor: '#1F2937',
-                        borderWidth: 6
+                        data: [gaiolasGrandes, gaiolasPequenas, pallets],
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'],
+                        borderColor: '#9ca3af',
+                        borderWidth: 3,
+                        borderRadius: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { 
+                            position: 'bottom', 
+                            labels: { color: '#d1d5db' }
+                        }
+                    }
+                }
+            });
+
+            // Gráfico de Empresas (JTZ vs JTA da sua planilha)
+            new Chart(document.getElementById('empresaChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['JTZ', 'JTA'],
+                    datasets: [{
+                        data: [16, 8], // Contagem real da sua planilha
+                        backgroundColor: ['#3b82f6', '#ef4444'],
+                        borderColor: '#9ca3af',
+                        borderWidth: 3
                     }]
                 },
                 options: {
@@ -180,82 +165,42 @@
                     plugins: {
                         legend: { 
                             position: 'bottom', 
-                            labels: { 
-                                color: '#d1d5db',
-                                font: { size: 14 }
-                            } 
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `${context.label}: ${context.raw} unidades`;
-                                }
-                            }
+                            labels: { color: '#d1d5db' }
                         }
                     }
                 }
             });
-        }
-        
-        function criarGraficoEntradas() {
-            if (entradasChartInstance) entradasChartInstance.destroy();
 
-            // Dados baseados na sua planilha real
-            const dados = {
-                labels: ['01/10/2025', '02/10/2025', '03/10/2025', '04/10/2025', '05/10/2025', '06/10/2025', '07/10/2025', '08/10/2025', '09/10/2025', '10/10/2025'],
-                values: [1, 1, 1, 3, 1, 1, 1, 1, 1, 2] // Contagem por dia na sua planilha
-            };
-
-            const ctx = document.getElementById('entradasChart').getContext('2d');
-            entradasChartInstance = new Chart(ctx, {
+            // Gráfico de Processados por Dia
+            new Chart(document.getElementById('processadosChart'), {
                 type: 'bar',
                 data: {
-                    labels: dados.labels,
+                    labels: ['01/10', '02/10', '03/10', '04/10', '10/10'],
                     datasets: [{
-                        label: 'Unidades Registradas',
-                        data: dados.values,
+                        label: 'Unidades Processadas',
+                        data: [2, 2, 2, 3, 15], // Contagem por dia na sua planilha
                         backgroundColor: 'rgba(59, 130, 246, 0.8)',
-                        borderColor: 'rgba(59, 130, 246, 1)',
-                        borderWidth: 1,
-                        borderRadius: 4
+                        borderRadius: 6,
+                        borderColor: '#9ca3af',
+                        borderWidth: 1
                     }]
                 },
                 options: { 
                     responsive: true,
                     scales: { 
                         y: { 
-                            beginAtZero: true,
+                            beginAtZero: true, 
                             grid: { color: '#374151' }, 
-                            ticks: { color: '#9ca3af', stepSize: 1 }
+                            ticks: { color: '#9ca3af' } 
                         },
                         x: { 
                             grid: { color: 'transparent' }, 
-                            ticks: { color: '#9ca3af', maxRotation: 45 }
-                        }
-                    }, 
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `Unidades: ${context.parsed.y}`;
-                                }
-                            }
+                            ticks: { color: '#9ca3af' } 
                         }
                     }
                 }
             });
-        }
-
-        function atualizarDados() {
-            // Simula atualização - na versão final puxaria do Google Sheets
-            const agora = new Date();
-            document.getElementById('last-update').textContent = 
-                `Atualizado em: ${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR')}`;
-            
-            // Aqui você pode adicionar a lógica para buscar dados reais
-            alert('Funcionalidade de atualização em tempo real será implementada com integração Google Sheets');
-        }
+        });
     </script>
 </body>
 </html>
