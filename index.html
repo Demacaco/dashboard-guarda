@@ -184,11 +184,10 @@
         // ======================================================================
         // CONFIGURAÇÃO - USE APENAS O LINK DA PLANILHA PRINCIPAL
         // ======================================================================
-        // Como o dado de retrabalho está na Coluna E dessa mesma planilha,
-        // só precisamos desse link.
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-9tfaJGoKEAxVduaIilOgyDyq6OQu2NdV9P8rES_MEQTK4wY4W6CdDpg4IM7eFpaO6InwAcbww9uk/pub?gid=0&single=true&output=csv'; 
         
-        const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+        // AQUI ESTAVA O ERRO! TROCAMOS 'allorigins' por 'corsproxy'
+        const PROXY_URL = 'https://corsproxy.io/?';
         // ======================================================================
 
         async function fetchData() {
@@ -213,7 +212,7 @@
                     return parseInt(val.replace(/['"]+/g, '').replace(/\./g, '')) || 0;
                 };
 
-                // Mapeamento das colunas da SUA planilha principal:
+                // Mapeamento das colunas da SUA planilha:
                 // A=0, B=1, C=2, D=3, E=4 (Retrabalho)
                 const totalRecebido = parseNum(dataRow[0]);
                 const filaGuarda = parseNum(dataRow[1]);
@@ -227,9 +226,6 @@
                 // Porcentagens
                 const percConclusao = totalRecebido > 0 ? (processados / totalRecebido) * 100 : 0;
                 const percPendencia = totalRecebido > 0 ? (filaGuarda / totalRecebido) * 100 : 0;
-                
-                // Cálculo da Taxa de Retrabalho (Retrabalho / Processados)
-                // Usamos "Processados" como base porque só existe erro no que foi feito.
                 const percRetrabalho = processados > 0 ? (qtdRetrabalho / processados) * 100 : 0;
 
                 // Atualiza Tela
@@ -249,7 +245,7 @@
                 document.getElementById('perc-pendentes').textContent = percPendencia.toFixed(0) + '%';
                 document.getElementById('perc-conclusao').textContent = percConclusao.toFixed(0) + '%';
                 
-                // AQUI ESTÁ A MÁGICA: Taxa de Retrabalho calculada e exibida
+                // Taxa de Retrabalho
                 document.getElementById('perc-rework').textContent = percRetrabalho.toFixed(1) + '% Rework';
 
                 // Barra de Progresso
