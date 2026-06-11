@@ -80,6 +80,16 @@
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(96, 165, 250, 0); } 100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); } }
         .pulse-animation { animation: pulse 2s infinite; }
+        
+        .error-message {
+            background: rgba(248, 113, 113, 0.2);
+            border: 1px solid #f87171;
+            color: #f87171;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px;
+        }
     </style>
 </head>
 <body>
@@ -181,89 +191,164 @@
     </div>
     
     <script>
-       // ======================================================================
-        // CONFIGURAÇÃO - USE APENAS O LINK DA PLANILHA PRINCIPAL
         // ======================================================================
-        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-9tfaJGoKEAxVduaIilOgyDyq6OQu2NdV9P8rES_MEQTK4wY4W6CdDpg4IM7eFpaO6InwAcbww9uk/pub?gid=0&single=true&output=csv'; 
+        // CONFIGURAÇÃO - VÁRIOS PROXY PARA FALLBACK
+        // ======================================================================
+        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-9tfaJGoKEAxVduaIilOgyDyq6OQu2NdV9P8rES_MEQTK4wY4W6CdDpg4IM7eFpaO6InwAcbww9uk/pub?gid=0&single=true&output=csv';
         
-        // AQUI ESTÁ A CORREÇÃO: Utilizando o allorigins (muito mais estável para CSV)
-        const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+        // Lista de proxies para tentar (fallback)
+        const PROXIES = [
+            'https://api.allorigins.win/raw?url=',
+            'https://cors-anywhere.herokuapp.com/',
+            'https://thingproxy.freeboard.io/fetch/',
+            'https://corsproxy.io/?'
+        ];
+        
+        let currentProxyIndex = 0;
+        
         // ======================================================================
 
         async function fetchData() {
+            const timeEl = document.querySelector('.timestamp');
+            
             try {
-                // Tenta carregar via Proxy para evitar bloqueio local
-                const response = await fetch(PROXY_URL + encodeURIComponent(SHEET_URL));
-                const dataText = await response.text();
+                let dataText = null;
+                let lastError = null;
                 
-                // Parse simples do CSV
-                const rows = dataText.split('\n');
-                if (rows.length < 2) return; 
-                
-                // Detecta se usa vírgula ou ponto e vírgula
-                let dataRow = rows[1].split(','); 
-                if (dataRow.length < 2) {
-                    dataRow = rows[1].split(';');
+                // Tenta cada proxy até funcionar
+                for (let i = currentProxyIndex; i < PROXIES.length; i++) {
+                    try {
+                        const proxyUrl = PROXIES[i] + encodeURIComponent(SHEET_URL);
+                        console.log(`Tentando proxy ${i+1}: ${PROXIES[i]}`);
+                        
+                        const response = await fetch(proxyUrl, {
+                            method: 'GET',
+                            mode: 'cors',
+                            headers: {
+                                'Accept': 'text/csv,text/plain,*/*'
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            dataText = await response.text();
+                            currentProxyIndex = i;
+                            console.log(`Proxy ${i+1} funcionou!`);
+                            break;
+                        } else {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                    } catch (err) {
+                        lastError = err;
+                        console.log(`Proxy ${i+1} falhou:`, err.message);
+                        continue;
+                    }
                 }
                 
-                // Helper para limpar números
-                const parseNum = (val) => {
-                    if (!val) return 0;
-                    return parseInt(val.replace(/['"]+/g, '').replace(/\./g, '')) || 0;
-                };
-
-                // Mapeamento das colunas da SUA planilha:
-                // A=0, B=1, C=2, D=3, E=4 (Retrabalho)
-                const totalRecebido = parseNum(dataRow[0]);
-                const filaGuarda = parseNum(dataRow[1]);
-                const gaiolas = parseNum(dataRow[2]);
-                const pallets = parseNum(dataRow[3]);
-                const qtdRetrabalho = parseNum(dataRow[4]); // Coluna E
-
-                // Cálculos
-                const processados = totalRecebido - filaGuarda;
+                if (!dataText) {
+                    throw new Error('Nenhum proxy funcionou: ' + lastError?.message);
+                }
                 
-                // Porcentagens
+                // Parse do CSV
+                const rows = dataText.trim().split('\n');
+                if (rows.length < 2) {
+                    throw new Error('CSV vazio ou mal formatado');
+                }
+                
+                // Pega a segunda linha (primeira linha de dados)
+                let dataRow = rows[1];
+                
+                // Tenta diferentes separadores
+                let rowData;
+                if (dataRow.includes(',')) {
+                    rowData = dataRow.split(',');
+                } else if (dataRow.includes(';')) {
+                    rowData = dataRow.split(';');
+                } else if (dataRow.includes('\t')) {
+                    rowData = dataRow.split('\t');
+                } else {
+                    rowData = [dataRow];
+                }
+                
+                // Limpa caracteres especiais
+                const cleanValue = (val) => {
+                    if (!val) return 0;
+                    const cleaned = String(val).replace(/['"\r\n]/g, '').trim();
+                    const num = parseInt(cleaned.replace(/\./g, ''));
+                    return isNaN(num) ? 0 : num;
+                };
+                
+                console.log('Dados brutos:', rowData);
+                
+                // Mapeamento das colunas
+                const totalRecebido = cleanValue(rowData[0]);
+                const filaGuarda = cleanValue(rowData[1]);
+                const gaiolas = cleanValue(rowData[2]);
+                const pallets = cleanValue(rowData[3]);
+                const qtdRetrabalho = cleanValue(rowData[4]);
+                
+                console.log('Valores extraídos:', {
+                    totalRecebido,
+                    filaGuarda,
+                    gaiolas,
+                    pallets,
+                    qtdRetrabalho
+                });
+                
+                // Validação dos dados
+                if (totalRecebido === 0 && filaGuarda === 0 && gaiolas === 0 && pallets === 0) {
+                    throw new Error('Todos os valores são zero - verificar formato do CSV');
+                }
+                
+                // Cálculos
+                const processados = Math.max(0, totalRecebido - filaGuarda);
                 const percConclusao = totalRecebido > 0 ? (processados / totalRecebido) * 100 : 0;
                 const percPendencia = totalRecebido > 0 ? (filaGuarda / totalRecebido) * 100 : 0;
                 const percRetrabalho = processados > 0 ? (qtdRetrabalho / processados) * 100 : 0;
-
-                // Atualiza Tela
+                
+                // Atualiza interface
                 updateValue('total-recebido', totalRecebido);
                 updateValue('timeline-recebido', totalRecebido);
-                
                 updateValue('fila-guarda', filaGuarda);
                 updateValue('timeline-pendentes', filaGuarda);
                 updateValue('detail-restante', filaGuarda);
-                
                 updateValue('gaiolas', gaiolas);
                 updateValue('pallets', pallets);
                 updateValue('timeline-processados', processados);
-
-                // Textos de %
-                document.getElementById('perc-processados').textContent = percConclusao.toFixed(0) + '%';
-                document.getElementById('perc-pendentes').textContent = percPendencia.toFixed(0) + '%';
-                document.getElementById('perc-conclusao').textContent = percConclusao.toFixed(0) + '%';
                 
-                // Taxa de Retrabalho
+                document.getElementById('perc-processados').textContent = percConclusao.toFixed(1) + '%';
+                document.getElementById('perc-pendentes').textContent = percPendencia.toFixed(1) + '%';
+                document.getElementById('perc-conclusao').textContent = percConclusao.toFixed(1) + '%';
                 document.getElementById('perc-rework').textContent = percRetrabalho.toFixed(1) + '% Rework';
-
-                // Barra de Progresso
+                
                 document.querySelector('.progress-bar').style.width = percConclusao + '%';
-
+                
                 updateTimestamp(true);
-
+                
+                // Remove mensagem de erro se existir
+                const errorDiv = document.querySelector('.error-message');
+                if (errorDiv) errorDiv.remove();
+                
             } catch (error) {
-                console.error('Erro ao buscar dados:', error);
-                const timeEl = document.querySelector('.timestamp');
-                timeEl.textContent = "Erro de conexão";
+                console.error('Erro detalhado:', error);
+                
+                timeEl.textContent = "⚠️ Erro de conexão - Tentando novamente...";
                 timeEl.style.color = "#f87171";
+                timeEl.style.background = "rgba(248, 113, 113, 0.2)";
+                
+                // Mostra erro na interface
+                if (!document.querySelector('.error-message')) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message';
+                    errorDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Falha na conexão com a planilha. Verificando novamente...`;
+                    document.querySelector('.progress-section').insertBefore(errorDiv, document.querySelector('.progress-container'));
+                }
             }
         }
-
+        
         function updateValue(elementId, newValue) {
             const element = document.getElementById(elementId);
             if (!element) return;
+            
             const formatted = newValue.toLocaleString('pt-BR');
             
             if (element.textContent !== formatted && element.textContent !== '---') {
@@ -271,32 +356,51 @@
                 setTimeout(() => {
                     element.textContent = formatted;
                     element.style.opacity = 1;
-                }, 300);
+                }, 150);
             } else {
                 element.textContent = formatted;
             }
         }
-
+        
         function updateTimestamp(success) {
             const now = new Date();
             const formattedDate = now.toLocaleDateString('pt-BR', { 
                 day: '2-digit', month: '2-digit', year: 'numeric',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
             });
+            
             const timeEl = document.querySelector('.timestamp');
             if (timeEl) {
-                timeEl.textContent = `Atualizado em: ${formattedDate}`;
-                if(success) timeEl.style.color = "#60a5fa";
+                timeEl.textContent = `✅ Atualizado em: ${formattedDate}`;
+                if(success) {
+                    timeEl.style.color = "#60a5fa";
+                    timeEl.style.background = "rgba(96, 165, 250, 0.15)";
+                }
             }
         }
-
-        // Inicia
+        
+        // Função de retry automático
+        let retryCount = 0;
+        let retryInterval = null;
+        
+        function startAutoRetry() {
+            if (retryInterval) clearInterval(retryInterval);
+            
+            retryInterval = setInterval(() => {
+                fetchData();
+            }, 30000); // Tenta a cada 30 segundos
+        }
+        
+        // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
             fetchData();
-            setInterval(fetchData, 60000);
+            startAutoRetry();
+            
+            // Mostra instruções no console
+            console.log('Sistema de Monitoramento Iniciado');
+            console.log('Planilha:', SHEET_URL);
+            console.log('Se persistir o erro, verifique se a planilha está publicada como CSV');
         });
     </script>
 </body>
 </html>
-
-
